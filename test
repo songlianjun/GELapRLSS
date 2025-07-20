@@ -1,0 +1,72 @@
+import numpy as np
+import pandas as pd
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
+from tensorflow.keras.models import load_model
+import joblib
+
+
+class StackingEnsembleModel:
+    def __init__(self, test_path='run/testAll_nr.csv', output_path='output/testAll_result_nr.xlsx'):
+        """
+        初始化模型，加载数据
+        """
+        self.test_path = test_path
+        self.output_path = output_path
+        self.base_models = [
+            ('rf', RandomForestClassifier(random_state=42)),
+            ('svm', SVC(probability=True, random_state=42)),
+            ('knn', KNeighborsClassifier()),
+            ('lr', LogisticRegression(random_state=42)),
+            ('xgb', XGBClassifier(random_state=42))
+        ]
+        self.meta_model = None
+
+    def load_models(self, path):
+        """
+        加载保存的模型，命名为 myModel
+        """
+        # 加载基础模型
+        model_dir = path
+        base_model_dir = os.path.join(model_dir, 'base_models')
+        self.base_models = []
+        for name in ['rf', 'svm', 'knn', 'lr', 'xgb']:
+            model = joblib.load(f'{base_model_dir}/{name}.pkl')
+            self.base_models.append((name, model))
+
+        # 加载元模型
+        meta_model_path = os.path.join(model_dir, 'meta_model.h5')
+        self.meta_model = load_model(meta_model_path)
+
+    def load_test_data(self):
+        """
+        加载测试数据
+        """
+        test_data = pd.read_csv(self.test_path)
+        test_data.set_index(test_data.columns[0], inplace=True)
+        self.test_index = test_data.index
+        self.test_data = np.array(test_data.values.tolist())
+
+
+    def run(self):
+        """
+        运行测试流程
+        """
+        # 加载保存的模型
+        self.load_models('models/Model_nr')
+        # 加载测试数据
+        self.load_test_data()
+        # 进行预测
+        self.predict()
+        # 保存预测结果
+        self.save_predictions()
+
+
+# 测试模型
+if __name__ == "__main__":
+    model = StackingEnsembleModel()
+    model.run()
